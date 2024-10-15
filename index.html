@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NodeSight Network Discovery Dashboard</title>
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style type="text/css">
+    #network {
+      width: 100%;
+      height: 800px;
+      border: 1px solid lightgray;
+      position: relative;
+    }
+    #controls {
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .vis-tooltip {
+      font-size: 14px;
+      padding: 5px;
+    }
+    #pageTitle {
+      text-align: center;
+      margin-top: 20px;
+    }
+    #detailsBox {
+    position: absolute;
+    bottom: 10px;
+    right: 10px; 
+    padding: 10px;
+    border: 1px solid lightgray;
+    font-size: 10px;
+    min-height: 50px;
+    background-color: #f9f9f9;
+    max-width: 400px;
+    z-index: 10; 
+    }
+
+    #placeholder {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      color: gray;
+      text-align: center;
+    }
+
+    #detailsBox h3 {
+      margin-top: 0;
+    }
+    #detailsBox ul {
+      list-style-type: disc;
+      margin-left: 20px;
+    }
+    #errorMsg {
+      color: red;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="pageTitle"></h1>
+  <div id="controls">
+    <button id="toggleClusters">Hide Main Clusters</button>
+    <input type="text" id="domainInput" placeholder="Enter Domain Name" />
+    <button id="addDomainButton">Add Domain(s)</button>
+    <input type="file" id="fileInput" multiple style="display: none;" />
+    <button id="customFileButton">Add Data Files</button>
+    <!-- <button id="processDataButton">Process Data</button> -->
+    <button id="processDataButton" disabled>Process Data</button>
+    <span id="fileLabel">No file selected</span>
+    <div id="errorMsg"></div>
+  </div>
+  <div id="network">
+    <div id="placeholder">Please upload your data using the "Add Data Files" button above, and then click "Process Data" button...</div>
+  </div>
+  <div id="detailsBox"></div>
+  <script type="text/javascript">
+
+    const domainNodes = [
+      {id: 'gov1', label: 'DIB Domain 1', group: 'domain', title: 'Domain Node: gov1'},
+      {id: 'gov2', label: 'DIB Domain 2', group: 'domain', title: 'Domain Node: gov2'},
+      {id: 'gov3', label: 'DIB Domain 3', group: 'domain', title: 'Domain Node: gov3'},
+      {id: 'bak1', label: 'Bakery Domain 1', group: 'domain', title: 'Domain Node: bak1'},
+      {id: 'health1', label: 'Healthcare Domain 1', group: 'domain', title: 'Domain Node: health1'},
+      {id: 'cathAll1', label: 'Uncat Unchar 1', group: 'domain', title: 'Domain Node: cathAll1'},
+      {id: 'cathAll2', label: 'Uncat Unchar 2', group: 'domain', title: 'Domain Node: cathAll2'},
+      {id: 'cathAll3', label: 'Uncat Unchar 3', group: 'domain', title: 'Domain Node: cathAll3'},
+      {id: 'cathAll4', label: 'Uncat Unchar 4', group: 'domain', title: 'Domain Node: cathAll4'},
+      {id: 'cathAll5', label: 'Uncat Unchar 5', group: 'domain', title: 'Domain Node: cathAll5'},
+      {id: 'cathAll6', label: 'Uncat Unchar 6', group: 'domain', title: 'Domain Node: cathAll6'},
+      {id: 'cathAll7', label: 'Uncat Unchar 7', group: 'domain', title: 'Domain Node: cathAll7'},
+    ];
+
+    const domainSubclusters = [
+      {id: 'DIBsubcluster', label: 'Critical Infrastructure Sector: Defense Industrial Base (DIB)', group: 'DomainSubcluster', title: 'Subcluster: DIB'},
+      {id: 'bakerySubcluster', label: 'Bakery', group: 'DomainSubcluster', title: 'Subcluster: Bakery'},
+      {id: 'healthcareSubcluster', label: 'Healthcare', group: 'DomainSubcluster', title: 'Subcluster: Healthcare'},
+      {id: 'cathAllSubcluster', label: 'Uncategorized or Uncharacterized', group: 'DomainSubcluster', title: 'Subcluster: Uncategorized'},
+    ];
+
+    const personaNodes = [
+      {id: 'cup1', label: 'Cupcakers 1', group: 'persona', title: 'Persona Node: cup1'},
+      {id: 'cup2', label: 'Cupcakers 2', group: 'persona', title: 'Persona Node: cup2'},
+      {id: 'cup3', label: 'Cupcakers 3', group: 'persona', title: 'Persona Node: cup3'},
+      {id: 'cup4', label: 'Cupcakers 4', group: 'persona', title: 'Persona Node: cup4'},
+      {id: 'cup5', label: 'Cupcakers 5', group: 'persona', title: 'Persona Node: cup5'},
+      {id: 'cup6', label: 'Cupcakers 6', group: 'persona', title: 'Persona Node: cup6'},
+      {id: 'rs1', label: 'Antidemocratic 1', group: 'persona', title: 'Persona Node: rs1'},
+      {id: 'rs2', label: 'Antidemocratic 2', group: 'persona', title: 'Persona Node: rs2'},
+      {id: 'rs3', label: 'Antidemocratic 3', group: 'persona', title: 'Persona Node: rs3'},
+      {id: 'rs4', label: 'Antidemocratic 4', group: 'persona', title: 'Persona Node: rs4'},
+      {id: 'bicy1', label: 'Bicycle Poloist 1', group: 'persona', title: 'Persona Node: bicy1'},
+      {id: 'bicy2', label: 'Bicycle Poloist 2', group: 'persona', title: 'Persona Node: bicy2'},
+      {id: 'bicy3', label: 'Bicycle Poloist 3', group: 'persona', title: 'Persona Node: bicy3'},
+      {id: 'bicy4', label: 'Bicycle Poloist 4', group: 'persona', title: 'Persona Node: bicy4'},
+      {id: 'bicy5', label: 'Bicycle Poloist 5', group: 'persona', title: 'Persona Node: bicy5'},
+    ];
+
+    const personaSubclusters = [
+      {id: 'Pumpernickel_Cupcakers', label: 'Pumpernickel Cupcakers Subcluster', group: 'PersonaSubcluster', title: 'Subcluster: Pumpernickel Cupcakers'},
+      {id: 'Red_Mallet_Scythers', label: 'Red Mallet Scythers Subcluster', group: 'PersonaSubcluster', title: 'Subcluster: Red Mallet Scythers'},
+      {id: 'Bicycling_Croqueters', label: 'Bicycling Croqueters Subcluster', group: 'PersonaSubcluster', title: 'Subcluster: Bicycling Croqueters'},
+    ];
+
+    const mainClusters = [
+      {id: 'domainsMainCluster', label: 'Domain Names Cluster', group: 'domainsMain', title: 'Main Cluster: Domains'},
+      {id: 'personasMainCluster', label: 'Online Personas Cluster', group: 'personasMain', title: 'Main Cluster: Personas'},
+    ];
+
+    const nodesArray = domainNodes.concat(domainSubclusters, personaNodes, personaSubclusters, mainClusters);
+
+    let edgesArray = [];
+    let edgeIdCounter = 1;
+
+    function addEdge(from, to) {
+      edgesArray.push({id: 'edge' + edgeIdCounter++, from: from, to: to});
+    }
+
+    // Connect domain nodes to their respective clusters
+    addEdge('DIBsubcluster', 'gov1');
+    addEdge('DIBsubcluster', 'gov2');
+    addEdge('DIBsubcluster', 'gov3');
+    addEdge('bakerySubcluster', 'bak1');
+    addEdge('healthcareSubcluster', 'health1');
+    addEdge('cathAllSubcluster', 'cathAll1');
+    addEdge('cathAllSubcluster', 'cathAll2');
+    addEdge('cathAllSubcluster', 'cathAll3');
+    addEdge('cathAllSubcluster', 'cathAll4');
+    addEdge('cathAllSubcluster', 'cathAll5');
+    addEdge('cathAllSubcluster', 'cathAll6');
+    addEdge('cathAllSubcluster', 'cathAll7');
+
+    // Define relationships between domains and personas
+    addEdge('gov1', 'rs1');
+    addEdge('bak1', 'cup1');
+    addEdge('health1', 'bicy1');
+    addEdge('gov2', 'cup2');
+    addEdge('gov3', 'bicy2');
+    addEdge('rs1', 'bicy2');
+    addEdge('cathAll7', 'bicy4');
+
+    // Connect the personas to their respective subclusters
+    addEdge('Pumpernickel_Cupcakers', 'cup1');
+    addEdge('Pumpernickel_Cupcakers', 'cup2');
+    addEdge('Pumpernickel_Cupcakers', 'cup3');
+    addEdge('Pumpernickel_Cupcakers', 'cup4');
+    addEdge('Pumpernickel_Cupcakers', 'cup5');
+    addEdge('Pumpernickel_Cupcakers', 'cup6');
+
+    addEdge('Red_Mallet_Scythers', 'rs1');
+    addEdge('Red_Mallet_Scythers', 'rs2');
+    addEdge('Red_Mallet_Scythers', 'rs3');
+    addEdge('Red_Mallet_Scythers', 'rs4');
+
+    addEdge('Bicycling_Croqueters', 'bicy1');
+    addEdge('Bicycling_Croqueters', 'bicy2');
+    addEdge('Bicycling_Croqueters', 'bicy3');
+    addEdge('Bicycling_Croqueters', 'bicy4');
+    addEdge('Bicycling_Croqueters', 'bicy5');
+
+    // Connect subclusters to the main persona cluster
+    addEdge('personasMainCluster', 'Pumpernickel_Cupcakers');
+    addEdge('personasMainCluster', 'Red_Mallet_Scythers');
+    addEdge('personasMainCluster', 'Bicycling_Croqueters');
+
+    // Connect the domain clusters to the "Domain Names Cluster"
+    addEdge('domainsMainCluster', 'DIBsubcluster');
+    addEdge('domainsMainCluster', 'bakerySubcluster');
+    addEdge('domainsMainCluster', 'healthcareSubcluster');
+    addEdge('domainsMainCluster', 'cathAllSubcluster');
+
+    // Connect personas in the Pumpernickel Cupcakers subcluster
+    addEdge('cup1', 'cup2');
+    addEdge('cup2', 'cup3');
+    addEdge('cup3', 'cup4');
+    addEdge('cup4', 'cup5');
+    addEdge('cup5', 'cup6');
+
+    // Connect personas in the Red Mallet Scythers subcluster
+    addEdge('rs1', 'rs2');
+    addEdge('rs2', 'rs3');
+    addEdge('rs3', 'rs4');
+
+    // Connect personas in the Bicycling Croqueters subcluster
+    addEdge('bicy1', 'bicy2');
+    addEdge('bicy2', 'bicy3');
+    addEdge('bicy3', 'bicy4');
+    addEdge('bicy4', 'bicy5');
+
+    // Affixing initial positions for main clusters and subclusters
+    const fixedPositions = {
+        'domainsMainCluster': {x: -600, y: 0},
+        'DIBsubcluster': {x: -600, y: -135},
+        'cathAllSubcluster': {x: -450, y: 0},
+        'bakerySubcluster': {x: -755, y: 0},
+        'healthcareSubcluster': {x: -600, y: 135},
+        'personasMainCluster': {x: 600, y: 0},
+        'Pumpernickel_Cupcakers': {x: 525, y: -120},
+        'Red_Mallet_Scythers': {x: 740, y: 0},
+        'Bicycling_Croqueters': {x: 525, y: 120},
+    };
+
+    // Function to assign positions around a center point
+    function assignPositionsAround(center, nodeIds, radius) {
+        const numNodes = nodeIds.length;
+        const positions = {};
+        for (let i = 0; i < numNodes; i++) {
+            const angle = 2 * Math.PI * i / numNodes;
+            const x = center.x + radius * Math.cos(angle);
+            const y = center.y + radius * Math.sin(angle);
+            positions[nodeIds[i]] = {x: x, y: y};
+        }
+        return positions;
+    }
+
+    let subclusterPositions = {};
+
+    const personaSubclusterList = [
+        {subclusterId: 'Pumpernickel_Cupcakers', centerId: 'Pumpernickel_Cupcakers'},
+        {subclusterId: 'Red_Mallet_Scythers', centerId: 'Red_Mallet_Scythers'},
+        {subclusterId: 'Bicycling_Croqueters', centerId: 'Bicycling_Croqueters'},
+    ];
+
+    personaSubclusterList.forEach(function(item) {
+      const center = fixedPositions[item.centerId];
+      const nodeIds = edgesArray.filter(function(edge) {
+        return edge.from === item.subclusterId && nodesArray.find(node => node.id === edge.to && node.group === 'persona');
+      }).map(edge => edge.to);
+      const positions = assignPositionsAround(center, nodeIds, 70);
+      Object.assign(subclusterPositions, positions);
+    });
+
+    const domainSubclusterList = [
+      {subclusterId: 'DIBsubcluster', centerId: 'DIBsubcluster'},
+      {subclusterId: 'bakerySubcluster', centerId: 'bakerySubcluster'},
+      {subclusterId: 'healthcareSubcluster', centerId: 'healthcareSubcluster'},
+      {subclusterId: 'cathAllSubcluster', centerId: 'cathAllSubcluster'},
+    ];
+
+    domainSubclusterList.forEach(function(item) {
+      const center = fixedPositions[item.centerId];
+      const nodeIds = edgesArray.filter(function(edge) {
+        return edge.from === item.subclusterId && nodesArray.find(node => node.id === edge.to && node.group === 'domain');
+      }).map(edge => edge.to);
+      const positions = assignPositionsAround(center, nodeIds, 70);
+      Object.assign(subclusterPositions, positions);
+    });
+
+    const positions = Object.assign({}, fixedPositions, subclusterPositions);
+
+    let network;
+    let nodesDataset;
+    let edgesDataset;
+    let hiddenNodes = {};
+    let isFirstCall = true;
+    let placeholderDisplayed = false;
+    let domainsAdded = false;
+
+    const container = document.getElementById('network');
+    const placeholder = document.getElementById('placeholder');
+    const domainInput = document.getElementById('domainInput');
+    const addDomainButton = document.getElementById('addDomainButton');
+    const fileInput = document.getElementById('fileInput');
+    const customButton = document.getElementById('customFileButton');
+    const processDataButton = document.getElementById('processDataButton');
+    const fileLabel = document.getElementById('fileLabel');
+    const errorMsg = document.getElementById('errorMsg');
+
+    
+    addDomainButton.addEventListener('click', function() {
+      const domainName = domainInput.value.trim();
+      if (domainName) {
+        addDomainNode(domainName);
+        domainInput.value = '';
+        errorMsg.textContent = '';
+      } else {
+        errorMsg.textContent = 'Please enter a domain name.';
+      }
+    });
+    
+    
+    customButton.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function() {
+        if (fileInput.files.length > 0) {
+            processDataButton.disabled = false;
+            fileLabel.textContent = Array.from(fileInput.files).map(file => file.name).join(', ');
+            errorMsg.textContent = '';
+        } else {
+            processDataButton.disabled = true;
+            fileLabel.textContent = 'No file selected';
+        }
+    });
+
+
+    processDataButton.addEventListener('click', function() {
+        if (fileInput.files.length > 0) {
+            processData(fileInput.files);
+            errorMsg.textContent = '';
+
+            if (!placeholderDisplayed) {
+                document.getElementById('placeholder').style.display = '';
+                placeholderDisplayed = true;
+                initializeNetwork();
+                console.log('initialized Network');
+            } else {
+                // updateNetworkData();
+                network.stabilize();
+            }
+
+            processDataButton.disabled = true;
+            // domainsAdded = false;
+            fileInput.value = '';
+            fileLabel.textContent = 'No file selected';
+        } else {
+            errorMsg.textContent = 'Please select at least one data file to process.';
+        }
+    });
+
+
+    function initializeNetwork() {
+        nodesDataset = new vis.DataSet(nodesArray);
+        edgesDataset = new vis.DataSet(edgesArray);
+
+        // Update to affix all nodes to their set initial positions 
+        nodesArray.forEach(function(node) {
+            if (positions[node.id]) {
+                nodesDataset.update({
+                id: node.id,
+                x: positions[node.id].x,
+                y: positions[node.id].y,
+                fixed: true
+                });
+            }
+            });
+
+        nodesArray.forEach(function(node) {
+            const style = nodeStyles[node.group];
+            if (style) {
+                nodesDataset.update({
+                id: node.id,
+                color: style.color,
+                size: style.size,
+                font: style.font,
+                labelHighlightBold: style.labelHighlightBold,
+                widthConstraint: style.widthConstraint,
+                x: positions[node.id] ? positions[node.id].x : undefined,
+                y: positions[node.id] ? positions[node.id].y : undefined,
+                fixed: positions[node.id] ? true : false
+                });
+            } else {
+                console.log('No style for group: ' + node.group);
+            }
+            });
+
+        const data = {
+            nodes: nodesDataset,
+            edges: edgesDataset
+            };
+
+        network = new vis.Network(container, data, options);
+        addNetworkEventListeners();
+        placeholder.style.display = 'none';
+        startPulsatingNodes();
+    }
+
+
+    function processData(files) {
+        if (isFirstCall) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const nodeName = file.name;
+            }
+            isFirstCall = false;
+        } else {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const nodeName = file.name;
+
+                if (i % 2 === 0) {
+                    addPersonaNode(nodeName, 'Pumpernickel_Cupcakers');
+                } else {
+                    addPersonaNode(nodeName, 'Red_Mallet_Scythers');
+                }
+            }
+        }
+    }
+
+
+    // Don't yet need/might not need to call 
+    function updateNetworkData() {
+
+        nodesArray.forEach(function(node) {
+            if (positions[node.id]) {
+            nodesDataset.update({
+                id: node.id,
+                x: positions[node.id].x,
+                y: positions[node.id].y,
+                fixed: true
+            });
+            }
+        });
+
+        nodesArray.forEach(function(node) {
+            const style = nodeStyles[node.group];
+            if (style) {
+            nodesDataset.update({
+                id: node.id,
+                color: style.color,
+                size: style.size,
+                font: style.font,
+                labelHighlightBold: style.labelHighlightBold,
+                widthConstraint: style.widthConstraint,
+                x: positions[node.id] ? positions[node.id].x : undefined,
+                y: positions[node.id] ? positions[node.id].y : undefined,
+                fixed: positions[node.id] ? true : false
+            });
+            } else {
+            console.log('No style for group: ' + node.group);
+            }
+        });
+
+        edgesArray.forEach(function(edge) {
+            if (
+                (edge.from === 'domainsMainCluster' && edge.to.indexOf('Subcluster') !== -1) ||
+                (edge.from === 'personasMainCluster' && edge.to.indexOf('Subcluster') !== -1)
+            ) {
+                edgesDataset.update({
+                id: edge.id,
+                physics: true,
+                length: 400,
+                smooth: false
+                });
+            } else {
+                edgesDataset.update({
+                id: edge.id,
+                physics: true,
+                length: 200,
+                smooth: false
+                });
+            }
+            });
+
+        network.stabilize();
+    }
+
+
+    function addNetworkEventListeners() {
+        // All network event listeners here and 
+        network.on('doubleClick', function(params) {
+        if (clickTimeout) {
+            clearTimeout(clickTimeout);
+            clickTimeout = null;
+        }
+
+        if (params.nodes.length) {
+            const clickedNodeId = params.nodes[0];
+            const clickedNode = nodesDataset.get(clickedNodeId);
+
+            if (clickedNode.group.includes('Subcluster')) {
+                const connectedNodeIds = network.getConnectedNodes(clickedNodeId);
+                const newNodes = [];
+
+                connectedNodeIds.forEach(function(nodeId) {
+                    if (hiddenNodes[nodeId]) {
+                        const initialPosition = positions[nodeId];
+                        
+                        if (initialPosition) {
+                            nodesDataset.update({
+                                id: nodeId,
+                                hidden: false,
+                                x: initialPosition.x,
+                                y: initialPosition.y,
+                                fixed: false,
+                                physics: true
+                            });
+                        } else {
+                            newNodes.push(nodeId);
+                        }
+
+                        delete hiddenNodes[nodeId];
+                    }
+                });
+
+                if (newNodes.length > 0) {
+                    const subclusterPosition = network.getPositions([clickedNodeId])[clickedNodeId];
+                    const newPositions = assignPositionsAround(subclusterPosition, newNodes, 70);
+                    Object.keys(newPositions).forEach(function(nodeId) {
+                        nodesDataset.update({
+                            id: nodeId,
+                            hidden: false,
+                            x: newPositions[nodeId].x,
+                            y: newPositions[nodeId].y,
+                            fixed: false,
+                            physics: true
+                        });
+                    });
+                }
+            
+            } else {
+            nodesDataset.update({ id: clickedNodeId, hidden: true });
+            hiddenNodes[clickedNodeId] = true;
+            }
+        }
+        });
+
+
+        network.on('beforeDrawing', function() {
+        if (network.physics.physicsEngine) {
+            network.physics.physicsEngine.angularVelocity = 0;
+            network.physics.physicsEngine.angularAcceleration = 0;
+        }
+        });
+
+        
+        network.on('click', function(params) {
+        if (clickTimeout) {
+            clearTimeout(clickTimeout);
+            clickTimeout = null;
+        }
+        clickTimeout = setTimeout(function() {
+            if (params.nodes.length) {
+            const clickedNodeId = params.nodes[0];
+            const clickedNode = nodesDataset.get(clickedNodeId);
+
+            displayNodeDetails(clickedNodeId);
+
+            if (clickedNode.group.includes('Subcluster')) {
+                const connectedNodeIds = network.getConnectedNodes(clickedNodeId);
+
+                // Get current state or initialize to false to toggle
+                const isReleased = subclusterStates[clickedNodeId] || false;
+
+                subclusterStates[clickedNodeId] = !isReleased;
+
+                if (subclusterStates[clickedNodeId]) {
+                nodesDataset.update({
+                    id: clickedNodeId,
+                    fixed: false,
+                    physics: false
+                });
+
+                // Unfix nodes and enable nodes' fanning out...
+                connectedNodeIds.forEach(function(nodeId) {
+                    const node = nodesDataset.get(nodeId);
+
+                    if (node.group === 'domain' || node.group === 'persona') {
+                    nodesDataset.update({
+                        id: nodeId,
+                        fixed: false,
+                        physics: true
+                    });
+                    }
+                });
+
+                network.physics.physicsEnabled = true;
+                network.stabilize();
+
+                } else {
+                resetSubclusterAndNodes(clickedNodeId);
+                console.log("Wuz hia?: clickedNodeId: " + clickedNodeId);
+                }
+
+            } else {
+                nodesArray.forEach(function(node) {
+                    if (node.id !== clickedNodeId) {
+                        const style = nodeStyles[node.group];
+                        if (style) {
+                            nodesDataset.update({
+                                id: node.id,
+                                color: style.color,
+                                // size: style.size,
+                                // font: style.font,
+                                // labelHighlightBold: style.labelHighlightBold,
+                                // widthConstraint: style.widthConstraint
+                            });
+                        }
+                    }
+                });
+
+                edgesArray.forEach(function(edge) {
+                    edgesDataset.update({ id: edge.id, color: { color: '#000' } });
+                    });
+
+                nodesDataset.update({
+                    id: clickedNodeId,
+                    color: {
+                        background: 'yellow',
+                        border: clickedNode.color ? clickedNode.color.border : '#000',
+                        highlight: clickedNode.color ? clickedNode.color.highlight : {},
+                        hover: clickedNode.color ? clickedNode.color.hover : {}
+                    },
+                    chosen: false // Disabled selection styles for this node because  by vis.js 
+                    // applies styles after click handler, which overwrites custom color mods.
+                });
+
+                const connectedNodes = network.getConnectedNodes(clickedNodeId);
+                
+                connectedNodes.forEach(function(nodeId) {
+                    const node = nodesDataset.get(nodeId);
+                    nodesDataset.update({
+                        id: nodeId,
+                        color: {
+                            background: 'orange',
+                            border: node.color ? node.color.border : '#000',
+                            highlight: node.color ? node.color.highlight : {},
+                            hover: node.color ? node.color.hover : {}
+                        }
+                    });
+                });
+
+                const connectedEdges = network.getConnectedEdges(clickedNodeId);
+                connectedEdges.forEach(function(edgeId) {
+                edgesDataset.update({
+                    id: edgeId, color: { color: 'red' } });
+                });
+                }
+            } else {
+            detailsBox.innerHTML = '';
+            }
+        }, 250);
+        });
+
+        network.on('dragStart', function(params) {
+        if (params.nodes.length) {
+            const nodeId = params.nodes[0];
+            const node = nodesDataset.get(nodeId);
+
+            if (node.group.includes('Subcluster')) {
+            if (subclusterStates[nodeId]) {
+                draggedSubclusterId = nodeId;
+                previousPosition = network.getPositions([nodeId])[nodeId];
+            }
+            }
+        }
+        });
+
+
+        network.on('dragging', function(params) {
+        if (draggedSubclusterId) {
+            const nodeId = draggedSubclusterId;
+
+            const currentPosition = network.getPositions([nodeId])[nodeId];
+
+            const dx = currentPosition.x - previousPosition.x;
+            const dy = currentPosition.y - previousPosition.y;
+
+            previousPosition = currentPosition;
+
+            const connectedNodeIds = network.getConnectedNodes(nodeId);
+
+            connectedNodeIds.forEach(function(connectedNodeId) {
+            const node = nodesDataset.get(connectedNodeId);
+
+            if (node.group === 'domain' || node.group === 'persona') {
+                const pos = network.getPositions([connectedNodeId])[connectedNodeId];
+                nodesDataset.update({
+                id: connectedNodeId,
+                x: pos.x + dx,
+                y: pos.y + dy
+                });
+            }
+            });
+        }
+        });
+
+
+        network.on('dragEnd', function(params) {
+        if (draggedSubclusterId) {
+            draggedSubclusterId = null;
+            previousPosition = null;
+        }
+        });
+        
+
+        // Increased mass should make Subcluster nodes less affected by other nodes
+        const subclusterMass = 5;
+        nodesArray.forEach(function(node) {
+        if (node.group.includes('Subcluster')) {
+            nodesDataset.update({
+            id: node.id,
+            mass: subclusterMass
+            });
+        }
+        });
+
+    }
+
+
+
+    // More physics settings...
+    const options = {
+      nodes: {
+        shape: 'dot',
+        size: 30,
+        font: {
+          size: 14,
+          color: '#000',
+          face: 'Arial'
+        },
+        borderWidth: 2
+      },
+      edges: {
+        width: 2,
+        color: '#000',
+        smooth: false
+      },
+      physics: {
+        enabled: true,
+        stabilization: {
+          iterations: 1000,
+          fit: true
+        },
+        solver: 'forceAtlas2Based',
+        forceAtlas2Based: {
+          gravitationalConstant: -50,
+          centralGravity: 0.005,
+          springConstant: 0.08,
+          springLength: 100,
+          damping: 0.4,
+          avoidOverlap: 1
+        },
+        maxVelocity: 50,
+        minVelocity: 0.1,
+        timestep: 0.35,
+        adaptiveTimestep: true
+      },
+      interaction: {
+        hover: true
+      },
+      layout: {
+        randomSeed: 1,
+        improvedLayout: false
+      }
+    };
+
+
+    const nodeStyles = {
+      'domainsMain': {
+        color: {
+          background: 'rgba(0, 128, 128, 0.35)',
+          border: 'black',
+          highlight: {
+            background: 'rgba(0, 128, 128, 0.5)',
+            border: 'black'
+          },
+          hover: {
+            background: 'rgba(0, 128, 128, 0.45)',
+            border: 'black'
+          }
+        },
+        size: 100,
+        font: {
+          size: 28,
+          color: '#000',
+          face: 'Arial',
+          multi: true,
+          bold: true
+        },
+        labelHighlightBold: true,
+        widthConstraint: {
+          maximum: 200
+        },
+      },
+      'personasMain': {
+        color: {
+          background: 'rgba(128, 0, 128, 0.35)',
+          border: 'black',
+          highlight: {
+            background: 'rgba(128, 0, 128, 0.5)',
+            border: 'black'
+          },
+          hover: {
+            background: 'rgba(128, 0, 128, 0.45)',
+            border: 'black'
+          }
+        },
+        size: 100,
+        font: {
+          size: 28,
+          color: '#000',
+          face: 'Arial',
+          multi: true,
+          bold: true
+        },
+        labelHighlightBold: true,
+        widthConstraint: {
+          maximum: 200
+        },
+      },
+      'DomainSubcluster': {
+        color: {
+          background: 'teal',
+          border: 'black',
+          highlight: {
+            background: 'darkslategray',
+            border: 'black'
+          },
+          hover: {
+            background: 'cadetblue',
+            border: 'black'
+          }
+        },
+        size: 60,
+        font: {
+          size: 24,
+          color: '#fff',
+          face: 'Arial',
+          multi: true,
+          bold: true,
+          vadjust: -200,
+        },
+        labelHighlightBold: true,
+        widthConstraint: {
+          maximum: 180
+        },
+      },
+      'PersonaSubcluster': {
+        color: {
+          background: 'purple',
+          border: 'black',
+          highlight: {
+            background: 'indigo',
+            border: 'black'
+          },
+          hover: {
+            background: 'mediumpurple',
+            border: 'black'
+          }
+        },
+        size: 60,
+        font: {
+          size: 24,
+          color: '#fff',
+          face: 'Arial',
+          multi: true,
+          bold: true,
+          vadjust: -200,
+        },
+        labelHighlightBold: true,
+        widthConstraint: {
+          maximum: 180
+        },
+      },
+      'domain': {
+        color: {
+          background: 'lightseagreen',
+          border: 'black',
+          highlight: {
+            background: 'mediumseagreen',
+            border: 'black'
+          },
+          hover: {
+            background: 'aquamarine',
+            border: 'black'
+          }
+        },
+        size: 30
+      },
+      'persona': {
+        color: {
+          background: '#E0B0FF',
+          border: 'black',
+          highlight: {
+            background: '#D8BFD8',
+            border: 'black'
+          },
+          hover: {
+            background: '#DDA0DD',
+            border: 'black'
+          }
+        },
+        size: 30
+      },
+    };
+
+
+
+    function addDomainNode(domainName) {
+        const newNodeId = 'domain_' + Date.now();
+
+        if (nodesDataset.get(newNodeId)) {
+            console.error('Node with ID ' + newNodeId + ' already exists');
+            return;
+        }
+
+        const newNode = {
+            id: newNodeId,
+            label: domainName,
+            group: 'domain',
+            title: 'Domain Node: ' + domainName,
+            color: nodeStyles['domain'].color,
+            size: nodeStyles['domain'].size,
+        };
+
+        nodesDataset.add(newNode);
+
+        const domainSubclusterIds = ['DIBsubcluster', 'bakerySubcluster', 'healthcareSubcluster', 'cathAllSubcluster'];
+        const randomIndex = Math.floor(Math.random() * domainSubclusterIds.length);
+        const selectedSubclusterId = domainSubclusterIds[randomIndex];
+
+        const newEdgeId = 'edge' + edgeIdCounter++;
+
+        if (edgesDataset.get(newEdgeId)) {
+            console.error('Edge with ID ' + newEdgeId + ' already exists');
+            return;
+        }
+
+        const newEdge = {
+            id: newEdgeId,
+            from: selectedSubclusterId,
+            to: newNodeId,
+            physics: true,
+            length: 70,
+            smooth: false
+        };
+
+        edgesDataset.add(newEdge);
+
+        positionNewNode(newNodeId, selectedSubclusterId);
+
+        nodesDataset.update({
+            id: newNodeId,
+            color: {
+                background: 'yellow',
+                border: 'red'
+            }
+        });
+
+        setTimeout(function() {
+            nodesDataset.update({
+                id: newNodeId,
+                color: nodeStyles['domain'].color
+            });
+        }, 4000);
+
+    }
+
+
+
+    function startPulsatingNodes() {
+        const pulsatingNodes = ['domainsMainCluster', 'personasMainCluster'];
+        const pulsateSizes = [300, 290, 280, 270, 260, 270, 280, 290, 300];
+        let pulsateIndex = 0;
+
+        setInterval(function() {
+            pulsateIndex = (pulsateIndex + 1) % pulsateSizes.length;
+            pulsatingNodes.forEach(function(nodeId) {
+                const node = nodesDataset.get(nodeId);
+                if (node) {
+                    const nodeGroup = node.group;
+                    const nodeStyle = nodeStyles[nodeGroup];
+                    // console.log('nodeGroup: ' + nodeGroup);
+
+                    if (nodeStyle) {
+                        nodesDataset.update({
+                            id: nodeId,
+                            size: pulsateSizes[pulsateIndex],
+                            color: nodeStyle.color,
+                            borderWidth: node.borderWidth || 2,
+                            borderWidthSelected: node.borderWidthSelected || 2,
+                            font: nodeStyle.font,
+                            labelHighlightBold: nodeStyle.labelHighlightBold,
+                            widthConstraint: nodeStyle.widthConstraint,
+                        });
+                    } else {
+                        console.error(`No style found for node group: ${nodeGroup}`);
+                    }
+                } else {
+                    console.error(`Node not found for ID: ${nodeId}`);
+                }
+            });
+        }, 500);
+
+
+        nodesDataset.update({
+        id: 'healthcareSubcluster',
+        font: {
+            size: 24,
+            color: '#fff',
+            face: 'Arial',
+            vadjust: -85,
+            bold: true,
+        }
+        });
+
+        nodesDataset.update({
+            id: 'bakerySubcluster',
+            font: {
+                size: 26,
+                color: '#fff',
+                face: 'Arial',
+                vadjust: -90,
+                bold: true,
+            }
+            });
+
+        nodesDataset.update({
+            id: 'cathAllSubcluster',
+            font: {
+                size: 24,
+                color: '#fff',
+                face: 'Arial',
+                vadjust: -110,
+                bold: true,
+            }
+            });
+
+        nodesDataset.update({
+            id: 'DIBsubcluster',
+            font: {
+                size: 24,
+                color: '#fff',
+                face: 'Arial',
+                vadjust: -160,
+                bold: true,
+            }
+            });
+
+        nodesDataset.update({
+            id: 'Pumpernickel_Cupcakers',
+            font: {
+                size: 24,
+                color: '#fff',
+                face: 'Arial',
+                vadjust: -110,
+                bold: true,
+            }
+            });
+
+        nodesDataset.update({
+            id: 'Red_Mallet_Scythers',
+            font: {
+                size: 24,
+                color: '#fff',
+                face: 'Arial',
+                vadjust: -110,
+                bold: true,
+            }
+            });
+
+        nodesDataset.update({
+            id: 'Bicycling_Croqueters',
+            font: {
+                size: 24,
+                color: '#fff',
+                face: 'Arial',
+                vadjust: -110,
+                bold: true,
+            }
+            });
+        
+        nodesArray.forEach(function(node) {
+            if (node.group === 'PersonaSubcluster') {
+                const nodeColor = nodeStyles['PersonaSubcluster'].color;
+                nodesDataset.update({
+                    id: node.id,
+                    color: {
+                        background: nodeColor.background,
+                        border: nodeColor.border,
+                        highlight: nodeColor.highlight,
+                        hover: nodeColor.hover
+                    }
+                });
+                console.log("Update PersonaSubcluster nodes' colors: " + node.id, nodeColor);
+
+            } else if (node.group === 'DomainSubcluster') {
+                const nodeColor = nodeStyles['DomainSubcluster'].color;
+                nodesDataset.update({
+                    id: node.id,
+                    color: {
+                        background: nodeColor.background,
+                        border: nodeColor.border,
+                        highlight: nodeColor.highlight,
+                        hover: nodeColor.hover
+                    }
+                });
+                console.log("Update DomainSubcluster nodes' colors: " + node.id, nodeColor);
+            }
+            console.log("Node group: " + node.group);
+
+        });
+        }
+
+
+    let showMainClusters = true;
+    const toggleButton = document.getElementById('toggleClusters');
+    const pulsatingNodes = ['domainsMainCluster', 'personasMainCluster'];
+
+    toggleButton.onclick = function() {
+    showMainClusters = !showMainClusters;
+    if (showMainClusters) {
+        // Show main clusters
+        nodesDataset.update(pulsatingNodes.map(function(nodeId) {
+        return { id: nodeId, hidden: false };
+        }));
+
+        const edgesToAdd = edgesArray.filter(function(edge) {
+        return pulsatingNodes.includes(edge.from) || pulsatingNodes.includes(edge.to);
+        });
+        edgesDataset.add(edgesToAdd);
+
+        toggleButton.innerHTML = 'Hide Main Clusters';
+    } else {
+        // Hide main clusters
+        nodesDataset.update(pulsatingNodes.map(function(nodeId) {
+        return { id: nodeId, hidden: true };
+        }));
+
+        const edgesToRemove = edgesArray.filter(function(edge) {
+        return pulsatingNodes.includes(edge.from) || pulsatingNodes.includes(edge.to);
+        }).map(function(edge) {
+        return edge.id;
+        });
+        edgesDataset.remove(edgesToRemove);
+
+        toggleButton.innerHTML = 'Show Main Clusters';
+    }
+    };
+
+
+    let subclusterStates = {};
+    const subclusterInitialPositions = {};
+    personaSubclusterList.forEach(function(item) {
+      subclusterInitialPositions[item.subclusterId] = positions[item.centerId];
+    });
+    domainSubclusterList.forEach(function(item) {
+      subclusterInitialPositions[item.subclusterId] = positions[item.centerId];
+    });
+
+
+    function resetSubclusterAndNodes(subclusterId) {
+        const initialPosition = subclusterInitialPositions[subclusterId];
+        nodesDataset.update({
+            id: subclusterId,
+            x: initialPosition.x,
+            y: initialPosition.y,
+            fixed: true,
+            physics: true
+        });
+
+        const connectedNodeIds = network.getConnectedNodes(subclusterId);
+        const newNodes = [];
+        const originalNodes = [];
+
+        connectedNodeIds.forEach(function(nodeId) {
+            const node = nodesDataset.get(nodeId);
+
+            if (positions[nodeId]) {
+                originalNodes.push(nodeId);
+            } else if (node.group === 'domain' || node.group === 'persona') {
+                newNodes.push(nodeId);
+            }
+        });
+
+        originalNodes.forEach(function(nodeId) {
+            const initialPosition = positions[nodeId];
+            nodesDataset.update({
+                id: nodeId,
+                x: initialPosition.x,
+                y: initialPosition.y,
+                fixed: true,
+                physics: true
+            });
+        });
+
+        if (newNodes.length > 0) {
+            const newPositions = assignPositionsAround(initialPosition, newNodes, 70);
+            Object.keys(newPositions).forEach(function(nodeId) {
+                nodesDataset.update({
+                    id: nodeId,
+                    x: newPositions[nodeId].x,
+                    y: newPositions[nodeId].y,
+                    fixed: true,
+                    physics: true
+                });
+            });
+        }
+    }
+
+    let draggedSubclusterId = null;
+    let previousPosition = null;
+
+    const detailsBox = document.getElementById('detailsBox');
+
+    let clickTimeout = null;
+    
+        
+
+    function displayNodeDetails(nodeId) {
+        const node = nodesDataset.get(nodeId);
+
+        let detailsHtml = '<h3>Node Details</h3>';
+        detailsHtml += '<p><strong>Selector:</strong> ' + node.id + '</p>';
+        detailsHtml += '<p><strong>Descriptor:</strong> ' + node.label + '</p>';
+        detailsHtml += '<p><strong>Group:</strong> ' + node.group + '</p>';
+
+        const connectedNodes = network.getConnectedNodes(nodeId);
+        if (connectedNodes.length > 0) {
+            detailsHtml += '<p><strong>Relationships:</strong></p><ul>';
+            connectedNodes.forEach(function(connectedNodeId) {
+            const connectedNode = nodesDataset.get(connectedNodeId);
+            detailsHtml += '<li><a href="#" onclick="selectNode(\'' + connectedNodeId + '\')">' + connectedNode.label + ' (' + connectedNode.id + ')</a></li>';
+            });
+            detailsHtml += '</ul>';
+        } else {
+            detailsHtml += '<p><strong>Connected Nodes:</strong> None</p>';
+        }
+
+        detailsBox.innerHTML = detailsHtml;
+    }
+
+
+    
+
+    function addPersonaNode(personaName, subclusterId) {
+        const newNodeId = 'persona_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+
+        if (nodesDataset.get(newNodeId)) {
+            console.error('Node with ID ' + newNodeId + ' already exists');
+            return;
+        }
+
+        const newNode = {
+            id: newNodeId,
+            label: personaName,
+            group: 'persona',
+            title: 'Persona Node: ' + personaName,
+            color: nodeStyles['persona'].color,
+            size: nodeStyles['persona'].size,
+        };
+
+        nodesDataset.add(newNode);
+        
+        const newEdgeId = 'edge' + edgeIdCounter++;
+
+        if (edgesDataset.get(newEdgeId)) {
+            console.error('Edge with ID ' + newEdgeId + ' already exists');
+            return;
+        }
+
+        const newEdge = {
+            id: newEdgeId,
+            from: subclusterId,
+            to: newNodeId,
+            physics: true,
+            length: 70,
+            smooth: false
+        };
+
+        edgesDataset.add(newEdge);
+
+        positionNewNode(newNodeId, subclusterId);
+
+        network.stabilize();
+
+        nodesDataset.update({
+            id: newNodeId,
+            color: {
+                background: 'yellow',
+                border: 'red'
+            }
+        });
+
+        setTimeout(function() {
+            nodesDataset.update({
+                id: newNodeId,
+                color: nodeStyles['persona'].color
+            });
+        }, 4000);
+
+    }
+
+
+
+    function positionNewNode(nodeId, subclusterId) {
+        const subclusterPosition = network.getPositions([subclusterId])[subclusterId];
+        let connectedNodes = network.getConnectedNodes(subclusterId);
+
+        connectedNodes = connectedNodes.filter(function(id) {
+            return id !== nodeId;
+        });
+
+        const numNodes = connectedNodes.length;
+        const angleIncrement = (2 * Math.PI) / (numNodes + 1);
+        const angle = angleIncrement * numNodes;
+        const radius = 70;
+        const x = subclusterPosition.x + radius * Math.cos(angle);
+        const y = subclusterPosition.y + radius * Math.sin(angle);
+        nodesDataset.update({
+            id: nodeId,
+            x: x,
+            y: y,
+            fixed: true,
+            physics: false
+        });
+    }
+
+    document.title = "NodeSight: Discover, Describe, and Analyze Networks to Identify Targets (Notional Deliverable Depiction)";
+    document.getElementById('pageTitle').innerText = document.title;
+
+  </script>
+</body>
+</html>
